@@ -1,55 +1,123 @@
 from datetime import datetime
 from uuid import uuid4
 
+from app.models.database import get_connection
+
 
 class CaseService:
     """
-    Handles core case-management operations.
-
-    Phase 1 uses in-memory storage.
-    This can later be replaced with SQLite
-    without changing the API structure.
+    Handles case-management operations using SQLite.
     """
-
-    def __init__(self):
-        self.cases = {}
 
     def create_case(
         self,
         description: str,
         incident_type: str | None = None,
     ) -> dict:
+
         case_id = str(uuid4())[:8]
+        now = datetime.utcnow().isoformat()
 
-        case = {
-            "case_id": case_id,
-            "description": description,
-            "incident_type": incident_type,
-            "status": "Created",
-            "created_at": datetime.utcnow().isoformat(),
-        }
+        connection = get_connection()
 
-        self.cases[case_id] = case
+        connection.execute(
+            """
+            INSERT INTO cases (
+                case_id,
+                description,
+                incident_type,
+                status,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                case_id,
+                description,
+                incident_type,
+                "Created",
+                now,
+                now,
+            ),
+        )
 
-        return case
+        connection.commit()
+        connection.close()
+
+        return self.get_case(case_id)
 
     def get_case(self, case_id: str) -> dict | None:
-        return self.cases.get(case_id)
+        connection = get_connection()
+
+        row = connection.execute(
+            """
+            SELECT *
+            FROM cases
+            WHERE case_id = ?
+            """,
+            (case_id,),
+        ).fetchone()
+
+        connection.close()
+
+        if not row:
+            return None
+
+        return dict(row)
 
     def update_case(
         self,
         case_id: str,
         updates: dict,
     ) -> dict | None:
-        case = self.cases.get(case_id)
+
+        case = self.get_case(case_id)
 
         if not case:
             return None
 
-        case.update(updates)
-        case["updated_at"] = datetime.utcnow().isoformat()
+        allowed_fields = {
+            "description",
+            "incident_type",
+            "status",
+            "updated_at",
+        }
 
-        return case
+        updates = {
+            key: value
+            for key, value in updates.items()
+            if key in allowed_fields
+        }
+
+        if not updates:
+            return case
+
+        updates["updated_at"] = datetime.utcnow().isoformat()
+
+        set_clause = ", ".join(
+            f"{key} = ?"
+            for key in updates
+        )
+
+        values = list(updates.values())
+        values.append(case_id)
+
+        connection = get_connection()
+
+        connection.execute(
+            f"""
+            UPDATE cases
+            SET {set_clause}
+            WHERE case_id = ?
+            """,
+            values,
+        )
+
+        connection.commit()
+        connection.close()
+
+        return self.get_case(case_id)
 
 
 case_service = CaseService()
