@@ -6,6 +6,7 @@ from app.routes.cases import router as cases_router
 from app.routes.evidence import router as evidence_router
 from app.routes.ai import router as ai_router
 from app.routes.severity import router as severity_router
+from app.routes.reports import router as reports_router
 
 
 app = FastAPI(
@@ -31,6 +32,7 @@ app.include_router(cases_router)
 app.include_router(evidence_router)
 app.include_router(ai_router)
 app.include_router(severity_router)
+app.include_router(reports_router)
 
 
 @app.get("/")
