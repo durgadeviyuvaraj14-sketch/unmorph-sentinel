@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.routes.health import router as health_router
+
 
 app = FastAPI(
     title="UNMORPH SENTINEL API",
@@ -19,18 +21,14 @@ app.add_middleware(
 )
 
 
+# Register API routes.
+app.include_router(health_router)
+
+
 @app.get("/")
 def root():
     return {
         "name": "UNMORPH SENTINEL",
         "status": "running",
         "message": "Backend API is working.",
-    }
-
-
-@app.get("/health")
-def health_check():
-    return {
-        "status": "healthy",
-        "service": "UNMORPH SENTINEL API",
     }
