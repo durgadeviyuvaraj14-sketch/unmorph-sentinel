@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.models.database import initialize_database
+from app.models.schema import initialize_full_schema
 
 from app.routes.health import router as health_router
 from app.routes.cases import router as cases_router
@@ -14,6 +16,9 @@ app = FastAPI(
     description="Backend API for the UNMORPH SENTINEL Phase 1 prototype.",
     version="1.0.0",
 )
+
+initialize_database()
+initialize_full_schema()
 
 
 app.add_middleware(
