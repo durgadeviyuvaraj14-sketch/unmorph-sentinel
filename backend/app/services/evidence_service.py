@@ -2,17 +2,14 @@ import hashlib
 from datetime import datetime
 from uuid import uuid4
 
+from app.models.database import get_connection
+
 
 class EvidenceService:
     """
-    Handles evidence metadata and integrity operations.
-
-    Phase 1 calculates a real SHA-256 hash for uploaded
-    file content. Persistent database storage can be added later.
+    Handles evidence metadata and integrity operations
+    using SQLite.
     """
-
-    def __init__(self):
-        self.evidence = {}
 
     def calculate_sha256(self, file_bytes: bytes) -> str:
         return hashlib.sha256(file_bytes).hexdigest()
@@ -27,29 +24,79 @@ class EvidenceService:
     ) -> dict:
 
         evidence_id = str(uuid4())[:8]
+        uploaded_at = datetime.utcnow().isoformat()
+        sha256 = self.calculate_sha256(file_bytes)
 
-        evidence = {
-            "evidence_id": evidence_id,
-            "case_id": case_id,
-            "filename": filename,
-            "content_type": content_type,
-            "description": description,
-            "size_bytes": len(file_bytes),
-            "sha256": self.calculate_sha256(file_bytes),
-            "uploaded_at": datetime.utcnow().isoformat(),
-            "status": "Preserved",
-        }
+        connection = get_connection()
 
-        self.evidence[evidence_id] = evidence
+        connection.execute(
+            """
+            INSERT INTO evidence (
+                evidence_id,
+                case_id,
+                filename,
+                content_type,
+                description,
+                size_bytes,
+                sha256,
+                uploaded_at,
+                status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                evidence_id,
+                case_id,
+                filename,
+                content_type,
+                description,
+                len(file_bytes),
+                sha256,
+                uploaded_at,
+                "Preserved",
+            ),
+        )
 
-        return evidence
+        connection.commit()
+        connection.close()
+
+        return self.get_evidence(evidence_id)
+
+    def get_evidence(self, evidence_id: str) -> dict | None:
+        connection = get_connection()
+
+        row = connection.execute(
+            """
+            SELECT *
+            FROM evidence
+            WHERE evidence_id = ?
+            """,
+            (evidence_id,),
+        ).fetchone()
+
+        connection.close()
+
+        if not row:
+            return None
+
+        return dict(row)
 
     def get_case_evidence(self, case_id: str) -> list[dict]:
-        return [
-            item
-            for item in self.evidence.values()
-            if item["case_id"] == case_id
-        ]
+        connection = get_connection()
+
+        rows = connection.execute(
+            """
+            SELECT *
+            FROM evidence
+            WHERE case_id = ?
+            ORDER BY uploaded_at ASC
+            """,
+            (case_id,),
+        ).fetchall()
+
+        connection.close()
+
+        return [dict(row) for row in rows]
 
 
 evidence_service = EvidenceService()
