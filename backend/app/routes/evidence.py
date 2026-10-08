@@ -1,22 +1,13 @@
-import hashlib
-from datetime import datetime
+from fastapi import APIRouter, UploadFile, File, Form
 from typing import Optional
 
-from fastapi import APIRouter, UploadFile, File, Form
+from app.services.evidence_service import evidence_service
 
 
 router = APIRouter(
     prefix="/api/evidence",
     tags=["Evidence"],
 )
-
-
-evidence_store = {}
-
-
-def calculate_sha256(file_bytes: bytes) -> str:
-    """Calculate the SHA-256 hash of uploaded evidence."""
-    return hashlib.sha256(file_bytes).hexdigest()
 
 
 @router.post("/upload")
@@ -27,22 +18,13 @@ async def upload_evidence(
 ):
     file_bytes = await file.read()
 
-    evidence_id = f"EVD-{len(evidence_store) + 1:04d}"
-    file_hash = calculate_sha256(file_bytes)
-
-    evidence = {
-        "evidence_id": evidence_id,
-        "case_id": case_id,
-        "filename": file.filename,
-        "content_type": file.content_type,
-        "description": description,
-        "size_bytes": len(file_bytes),
-        "sha256": file_hash,
-        "uploaded_at": datetime.utcnow().isoformat(),
-        "status": "Preserved",
-    }
-
-    evidence_store[evidence_id] = evidence
+    evidence = evidence_service.create_evidence(
+        case_id=case_id,
+        filename=file.filename,
+        content_type=file.content_type,
+        file_bytes=file_bytes,
+        description=description,
+    )
 
     return {
         "success": True,
@@ -53,15 +35,11 @@ async def upload_evidence(
 
 @router.get("/{case_id}")
 def get_case_evidence(case_id: str):
-    case_evidence = [
-        evidence
-        for evidence in evidence_store.values()
-        if evidence["case_id"] == case_id
-    ]
+    evidence = evidence_service.get_case_evidence(case_id)
 
     return {
         "success": True,
         "case_id": case_id,
-        "count": len(case_evidence),
-        "evidence": case_evidence,
+        "count": len(evidence),
+        "evidence": evidence,
     }
