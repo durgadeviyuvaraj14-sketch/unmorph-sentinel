@@ -16,7 +16,6 @@ app = FastAPI(
 )
 
 
-# Allow the React frontend to communicate with the backend.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,7 +25,6 @@ app.add_middleware(
 )
 
 
-# Register API routes.
 app.include_router(health_router)
 app.include_router(cases_router)
 app.include_router(evidence_router)
