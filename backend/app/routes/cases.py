@@ -1,8 +1,7 @@
-from datetime import datetime
-from uuid import uuid4
-
 from fastapi import APIRouter
 from pydantic import BaseModel
+
+from app.services.case_service import case_service
 
 
 router = APIRouter(
@@ -16,22 +15,12 @@ class CaseCreate(BaseModel):
     incident_type: str | None = None
 
 
-cases = {}
-
-
 @router.post("/")
 def create_case(case: CaseCreate):
-    case_id = str(uuid4())[:8]
-
-    new_case = {
-        "case_id": case_id,
-        "description": case.description,
-        "incident_type": case.incident_type,
-        "status": "Created",
-        "created_at": datetime.utcnow().isoformat(),
-    }
-
-    cases[case_id] = new_case
+    new_case = case_service.create_case(
+        description=case.description,
+        incident_type=case.incident_type,
+    )
 
     return {
         "success": True,
@@ -41,7 +30,7 @@ def create_case(case: CaseCreate):
 
 @router.get("/{case_id}")
 def get_case(case_id: str):
-    case = cases.get(case_id)
+    case = case_service.get_case(case_id)
 
     if not case:
         return {
